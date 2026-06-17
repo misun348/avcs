@@ -1,0 +1,1700 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>눈썹 디펜스 3D</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            min-height: 100vh;
+            overflow: hidden;
+        }
+        #gameContainer {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+        }
+        #gameCanvas {
+            display: block;
+        }
+        #ui {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            color: white;
+            font-size: 16px;
+            background: rgba(0,0,0,0.7);
+            padding: 15px;
+            border-radius: 10px;
+            z-index: 100;
+        }
+        #ui div {
+            margin: 5px 0;
+        }
+        #unitPanel {
+            position: absolute;
+            bottom: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 10px;
+            background: rgba(0,0,0,0.8);
+            padding: 15px;
+            border-radius: 15px;
+            z-index: 100;
+        }
+        .unitBtn {
+            width: 80px;
+            height: 100px;
+            border: 2px solid #444;
+            border-radius: 10px;
+            background: linear-gradient(180deg, #2a2a4a 0%, #1a1a3a 100%);
+            color: white;
+            cursor: pointer;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s;
+            font-size: 11px;
+        }
+        .unitBtn:hover {
+            border-color: #00ff88;
+            transform: scale(1.05);
+            box-shadow: 0 0 15px rgba(0,255,136,0.5);
+        }
+        .unitBtn.selected {
+            border-color: #00ff88;
+            background: linear-gradient(180deg, #3a3a6a 0%, #2a2a5a 100%);
+        }
+        .unitBtn .icon {
+            font-size: 28px;
+            margin-bottom: 5px;
+        }
+        .unitBtn .cost {
+            color: #ffd700;
+            font-weight: bold;
+        }
+        #instructions {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            color: white;
+            background: rgba(0,0,0,0.7);
+            padding: 15px;
+            border-radius: 10px;
+            font-size: 12px;
+            max-width: 250px;
+            z-index: 100;
+        }
+        #waveAnnounce {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #ff6b6b;
+            font-size: 48px;
+            font-weight: bold;
+            text-shadow: 0 0 20px #ff0000;
+            opacity: 0;
+            transition: opacity 0.5s;
+            z-index: 200;
+            pointer-events: none;
+        }
+        #gameOver {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0,0,0,0.9);
+            padding: 40px;
+            border-radius: 20px;
+            text-align: center;
+            color: white;
+            display: none;
+            z-index: 300;
+        }
+        #gameOver h1 {
+            color: #ff4444;
+            margin-bottom: 20px;
+        }
+        #gameOver button {
+            padding: 15px 40px;
+            font-size: 18px;
+            background: #00ff88;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            margin-top: 20px;
+        }
+        #startScreen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            z-index: 400;
+        }
+        #startScreen h1 {
+            font-size: 64px;
+            margin-bottom: 20px;
+            text-shadow: 0 0 30px #00ff88;
+        }
+        #startScreen p {
+            font-size: 18px;
+            margin-bottom: 30px;
+            max-width: 600px;
+            text-align: center;
+            line-height: 1.6;
+        }
+        #startScreen button {
+            padding: 20px 60px;
+            font-size: 24px;
+            background: linear-gradient(180deg, #00ff88 0%, #00cc6a 100%);
+            border: none;
+            border-radius: 15px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: transform 0.3s;
+        }
+        #startScreen button:hover {
+            transform: scale(1.1);
+        }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <canvas id="gameCanvas"></canvas>
+        
+        <div id="ui">
+            <div>🏰 타워 HP: <span id="towerHp">500000</span></div>
+            <div>💰 골드: <span id="gold">20</span></div>
+            <div>🌊 웨이브: <span id="wave">1</span></div>
+            <div>⏱️ 다음 웨이브: <span id="nextWave">30</span>초</div>
+        </div>
+        
+        <div id="instructions">
+            <strong>조작법:</strong><br>
+            • 아래 유닛 선택 후 맵 클릭으로 배치<br>
+            • 같은 유닛 합성: 2개→Lv2, 3개→Lv3...<br>
+            • 8자 맵을 따라 적이 이동<br>
+            • 타워를 지켜라!<br><br>
+            <strong>드래그:</strong> 카메라 회전<br>
+            <strong>휠:</strong> 줌 인/아웃
+        </div>
+        
+        <div id="unitPanel">
+            <button class="unitBtn" data-unit="jangseon" title="장미선 - 탱커">
+                <div class="icon">🧔</div>
+                <div>장미선</div>
+                <div class="cost">2G</div>
+            </button>
+            <button class="unitBtn" data-unit="killjoy" title="킬조이 - 포탑 설치">
+                <div class="icon">🔫</div>
+                <div>킬조이</div>
+                <div class="cost">2G</div>
+            </button>
+            <button class="unitBtn" data-unit="foodduck" title="푸드덕 - 비둘기 폭격">
+                <div class="icon">🕊️</div>
+                <div>푸드덕</div>
+                <div class="cost">10G</div>
+            </button>
+            <button class="unitBtn" data-unit="disman" title="디스맨 - 관통 마법">
+                <div class="icon">🧙</div>
+                <div>디스맨</div>
+                <div class="cost">30G</div>
+            </button>
+            <button class="unitBtn" data-unit="fusion" title="장미킬푸드덕디스맨 - 융합체">
+                <div class="icon">⭐</div>
+                <div>융합체</div>
+                <div class="cost">100G</div>
+            </button>
+        </div>
+        
+        <div id="waveAnnounce"></div>
+        
+        <div id="gameOver">
+            <h1>💀 게임 오버 💀</h1>
+            <p>웨이브 <span id="finalWave">1</span>까지 생존!</p>
+            <button onclick="location.reload()">다시 시작</button>
+        </div>
+        
+        <div id="startScreen">
+            <h1>🌹 눈썹 디펜스 3D 🌹</h1>
+            <p>
+                8자 모양 맵에서 밀려오는 적들로부터 타워를 지켜라!<br>
+                장미, 해, 말, 김도율... 그리고 최종 보스 김도율장미해말마까지!<br>
+                유닛을 배치하고 합성하여 무한 웨이브에 도전하세요!
+            </p>
+            <button onclick="startGame()">게임 시작</button>
+        </div>
+    </div>
+
+    <script>
+        // Canvas & Context
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        // Resize
+        function resize() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        resize();
+        window.addEventListener('resize', resize);
+        
+        // Game State
+        let gameStarted = false;
+        let gameOver = false;
+        let gold = 20;
+        let towerHp = 500000;
+        let wave = 1;
+        let waveTimer = 30;
+        let lastTime = 0;
+        let selectedUnit = null;
+        
+        // Camera (3D-like projection)
+        let cameraAngle = 0;
+        let cameraZoom = 1;
+        let cameraTilt = 0.6;
+        
+        // 8자 Path (figure-8)
+        const pathPoints = [];
+        function generatePath() {
+            pathPoints.length = 0;
+            const centerX = canvas.width / 2;
+            const centerY = canvas.height / 2;
+            const scaleX = Math.min(canvas.width * 0.35, 400);
+            const scaleY = Math.min(canvas.height * 0.25, 200);
+            
+            for (let t = 0; t <= Math.PI * 2; t += 0.05) {
+                const x = centerX + scaleX * Math.sin(t);
+                const y = centerY + scaleY * Math.sin(2 * t);
+                pathPoints.push({x, y});
+            }
+        }
+        generatePath();
+        window.addEventListener('resize', generatePath);
+        
+        // Tower position (center of 8)
+        function getTowerPos() {
+            return {x: canvas.width / 2, y: canvas.height / 2};
+        }
+        
+        // Entities
+        let enemies = [];
+        let playerUnits = [];
+        let projectiles = [];
+        let effects = [];
+        let turrets = [];
+        let bombs = [];
+        
+        // Enemy definitions
+        const enemyTypes = {
+            rose: {
+                name: '장미',
+                hp: 10,
+                speed: 30,
+                color: '#ff6b6b',
+                size: 20,
+                attackType: 'projectile',
+                towerDmg: 100,
+                unitDmg: 5,
+                attackInterval: 2000,
+                goldValue: 1
+            },
+            sun: {
+                name: '해',
+                hp: 15,
+                speed: 25,
+                color: '#ffd93d',
+                size: 25,
+                attackType: 'beam',
+                towerDps: 80,
+                unitDps: 4,
+                goldValue: 2
+            },
+            horse: {
+                name: '말',
+                hp: 40,
+                speed: 80,
+                color: '#8b4513',
+                size: 30,
+                attackType: 'charge',
+                towerImpact: 1000,
+                towerDps: 200,
+                unitImpact: 30,
+                unitDps: 10,
+                goldValue: 4
+            },
+            kimdoyul: {
+                name: '김도율',
+                hp: 100,
+                speed: 20,
+                color: '#9b59b6',
+                size: 35,
+                attackType: 'magic',
+                towerDps: 700,
+                unitDps: 23,
+                eyebrowInterval: 5000,
+                eyebrowDps: 1000,
+                goldValue: 10
+            },
+            fusion: {
+                name: '김도율장미해말마',
+                hp: 500,
+                speed: 40,
+                color: '#e74c3c',
+                size: 50,
+                attackType: 'fusion',
+                damageMultiplier: 0.7,
+                goldValue: 50
+            }
+        };
+        
+        // Player unit definitions
+        const unitTypes = {
+            jangseon: {
+                name: '장미선',
+                hp: 30,
+                cost: 2,
+                role: 'tank',
+                dps: 2,
+                color: '#3498db',
+                size: 25
+            },
+            killjoy: {
+                name: '킬조이',
+                hp: 10,
+                cost: 2,
+                role: 'turret',
+                turretDps: 5,
+                color: '#e67e22',
+                size: 20
+            },
+            foodduck: {
+                name: '푸드덕',
+                hp: 10,
+                cost: 10,
+                role: 'bomber',
+                bombDmg: 30,
+                color: '#ecf0f1',
+                size: 20,
+                flying: true
+            },
+            disman: {
+                name: '디스맨',
+                hp: 20,
+                cost: 30,
+                role: 'assassin',
+                dps: 50,
+                color: '#1abc9c',
+                size: 22
+            },
+            fusion: {
+                name: '장미킬푸드덕디스맨',
+                hp: 70,
+                cost: 100,
+                role: 'fusion',
+                damageMultiplier: 0.7,
+                color: '#f39c12',
+                size: 35
+            }
+        };
+        
+        // Wave configurations
+        function getWaveEnemies(waveNum) {
+            const enemies = [];
+            const baseCount = 3 + waveNum;
+            
+            if (waveNum === 1) {
+                for (let i = 0; i < baseCount; i++) {
+                    enemies.push(Math.random() < 0.5 ? 'rose' : 'sun');
+                }
+            } else if (waveNum === 2) {
+                for (let i = 0; i < baseCount; i++) {
+                    const r = Math.random();
+                    if (r < 0.4) enemies.push('rose');
+                    else if (r < 0.7) enemies.push('sun');
+                    else enemies.push('horse');
+                }
+            } else if (waveNum === 3) {
+                for (let i = 0; i < baseCount; i++) {
+                    const r = Math.random();
+                    if (r < 0.3) enemies.push('rose');
+                    else if (r < 0.5) enemies.push('sun');
+                    else if (r < 0.8) enemies.push('horse');
+                    else if (r < 0.9) enemies.push('kimdoyul');
+                }
+            } else if (waveNum === 4) {
+                for (let i = 0; i < baseCount; i++) {
+                    const r = Math.random();
+                    if (r < 0.3) enemies.push('sun');
+                    else if (r < 0.6) enemies.push('horse');
+                    else enemies.push('kimdoyul');
+                }
+            } else {
+                const fusionChance = Math.min(0.1 + (waveNum - 5) * 0.05, 0.5);
+                for (let i = 0; i < baseCount; i++) {
+                    const r = Math.random();
+                    if (r < fusionChance) enemies.push('fusion');
+                    else if (r < fusionChance + 0.3) enemies.push('kimdoyul');
+                    else if (r < fusionChance + 0.6) enemies.push('horse');
+                    else enemies.push(Math.random() < 0.5 ? 'rose' : 'sun');
+                }
+            }
+            return enemies;
+        }
+        
+        // Spawn enemy
+        function spawnEnemy(type) {
+            const def = enemyTypes[type];
+            const startIdx = 0;
+            const pos = pathPoints[startIdx];
+            
+            enemies.push({
+                type,
+                ...def,
+                currentHp: def.hp * (1 + wave * 0.1),
+                maxHp: def.hp * (1 + wave * 0.1),
+                x: pos.x,
+                y: pos.y,
+                pathIndex: startIdx,
+                lastAttack: 0,
+                charging: false,
+                chargeTarget: null,
+                eyebrowTimer: 0,
+                stuck: false
+            });
+        }
+        
+        // Spawn player unit
+        function spawnPlayerUnit(type, x, y) {
+            const def = unitTypes[type];
+            if (gold < def.cost) return false;
+            
+            gold -= def.cost;
+            updateUI();
+            
+            // Check for merge
+            const nearby = playerUnits.filter(u => 
+                u.type === type && 
+                Math.hypot(u.x - x, u.y - y) < 50
+            );
+            
+            if (nearby.length > 0) {
+                // Merge!
+                const target = nearby[0];
+                target.level = (target.level || 1) + 1;
+                target.currentHp = def.hp * target.level;
+                target.maxHp = def.hp * target.level;
+                effects.push({
+                    type: 'levelup',
+                    x: target.x,
+                    y: target.y,
+                    timer: 1
+                });
+                return true;
+            }
+            
+            const unit = {
+                type,
+                ...def,
+                currentHp: def.hp,
+                maxHp: def.hp,
+                x,
+                y,
+                level: 1,
+                lastAttack: 0,
+                turretPlaced: false,
+                targetEnemy: null,
+                assassinPhase: 'idle',
+                assassinTimer: 0,
+                originalPos: {x, y}
+            };
+            
+            playerUnits.push(unit);
+            
+            // Killjoy places turret
+            if (type === 'killjoy' || type === 'fusion') {
+                turrets.push({
+                    x: x + 30,
+                    y: y,
+                    owner: unit,
+                    dps: def.turretDps || 5,
+                    lastAttack: 0
+                });
+            }
+            
+            return true;
+        }
+        
+        // Update functions
+        function updateEnemies(dt) {
+            for (let i = enemies.length - 1; i >= 0; i--) {
+                const e = enemies[i];
+                
+                // Move along path
+                if (!e.stuck && !e.charging) {
+                    const targetIdx = Math.min(e.pathIndex + 1, pathPoints.length - 1);
+                    const target = pathPoints[targetIdx];
+                    const dx = target.x - e.x;
+                    const dy = target.y - e.y;
+                    const dist = Math.hypot(dx, dy);
+                    
+                    if (dist < 5) {
+                        e.pathIndex = targetIdx;
+                        if (e.pathIndex >= pathPoints.length - 1) {
+                            // Reached end, attack tower
+                            attackTower(e, dt);
+                        }
+                    } else {
+                        e.x += (dx / dist) * e.speed * dt;
+                        e.y += (dy / dist) * e.speed * dt;
+                    }
+                }
+                
+                // Attack logic
+                handleEnemyAttack(e, dt);
+                
+                // Check death
+                if (e.currentHp <= 0) {
+                    const goldEarned = e.goldValue * (1 + wave * 0.2);
+                    gold += Math.floor(goldEarned);
+                    effects.push({
+                        type: 'death',
+                        x: e.x,
+                        y: e.y,
+                        color: e.color,
+                        timer: 0.5
+                    });
+                    enemies.splice(i, 1);
+                    updateUI();
+                }
+            }
+        }
+        
+        function handleEnemyAttack(e, dt) {
+            const now = Date.now();
+            const towerPos = getTowerPos();
+            const towerDist = Math.hypot(e.x - towerPos.x, e.y - towerPos.y);
+            
+            // Find nearest player unit
+            let nearestUnit = null;
+            let nearestDist = Infinity;
+            for (const u of playerUnits) {
+                const d = Math.hypot(e.x - u.x, e.y - u.y);
+                if (d < nearestDist) {
+                    nearestDist = d;
+                    nearestUnit = u;
+                }
+            }
+            
+            if (e.type === 'rose' || e.attackType === 'projectile') {
+                if (now - e.lastAttack > 2000) {
+                    e.lastAttack = now;
+                    // Shoot red circle
+                    const target = nearestUnit && nearestDist < 200 ? nearestUnit : 
+                                  towerDist < 300 ? towerPos : null;
+                    if (target) {
+                        projectiles.push({
+                            x: e.x,
+                            y: e.y,
+                            targetX: target.x || towerPos.x,
+                            targetY: target.y || towerPos.y,
+                            color: '#ff0000',
+                            size: 8,
+                            speed: 150,
+                            damage: target === towerPos ? 100 : 5,
+                            isEnemyProjectile: true,
+                            targetUnit: target !== towerPos ? target : null
+                        });
+                    }
+                }
+            }
+            
+            if (e.type === 'sun' || e.attackType === 'beam') {
+                // Continuous beam damage
+                if (towerDist < 250) {
+                    towerHp -= e.towerDps * dt * (e.damageMultiplier || 1);
+                    effects.push({
+                        type: 'beam',
+                        x1: e.x,
+                        y1: e.y,
+                        x2: towerPos.x,
+                        y2: towerPos.y,
+                        color: '#ffd93d',
+                        timer: 0.05
+                    });
+                }
+                if (nearestUnit && nearestDist < 150) {
+                    nearestUnit.currentHp -= e.unitDps * dt * (e.damageMultiplier || 1);
+                }
+            }
+            
+            if (e.type === 'horse' || e.attackType === 'charge') {
+                if (!e.charging && (towerDist < 200 || nearestDist < 150)) {
+                    e.charging = true;
+                    e.chargeTarget = nearestUnit && nearestDist < towerDist ? nearestUnit : 'tower';
+                }
+                if (e.charging) {
+                    const target = e.chargeTarget === 'tower' ? towerPos : e.chargeTarget;
+                    if (!target || (target !== towerPos && target.currentHp <= 0)) {
+                        e.charging = false;
+                        return;
+                    }
+                    const tx = target.x || towerPos.x;
+                    const ty = target.y || towerPos.y;
+                    const dx = tx - e.x;
+                    const dy = ty - e.y;
+                    const dist = Math.hypot(dx, dy);
+                    
+                    if (dist < 20) {
+                        // Impact!
+                        if (e.chargeTarget === 'tower') {
+                            if (!e.impacted) {
+                                towerHp -= e.towerImpact * (e.damageMultiplier || 1);
+                                e.impacted = true;
+                            }
+                            towerHp -= e.towerDps * dt * (e.damageMultiplier || 1);
+                        } else if (target) {
+                            if (!e.impacted) {
+                                target.currentHp -= e.unitImpact * (e.damageMultiplier || 1);
+                                e.impacted = true;
+                            }
+                            target.currentHp -= e.unitDps * dt * (e.damageMultiplier || 1);
+                        }
+                        e.stuck = true;
+                    } else {
+                        e.x += (dx / dist) * e.speed * 2 * dt;
+                        e.y += (dy / dist) * e.speed * 2 * dt;
+                    }
+                }
+            }
+            
+            if (e.type === 'kimdoyul' || e.attackType === 'magic') {
+                // Area magic damage
+                if (towerDist < 300) {
+                    towerHp -= e.towerDps * dt * (e.damageMultiplier || 1);
+                }
+                for (const u of playerUnits) {
+                    if (Math.hypot(e.x - u.x, e.y - u.y) < 150) {
+                        u.currentHp -= e.unitDps * dt * (e.damageMultiplier || 1);
+                    }
+                }
+                
+                // Eyebrow attack
+                e.eyebrowTimer = (e.eyebrowTimer || 0) + dt * 1000;
+                if (e.eyebrowTimer > 5000) {
+                    e.eyebrowTimer = 0;
+                    effects.push({
+                        type: 'eyebrow',
+                        x: e.x + (Math.random() - 0.5) * 100,
+                        y: e.y + (Math.random() - 0.5) * 100,
+                        timer: 3,
+                        dps: 1000
+                    });
+                }
+            }
+            
+            if (e.type === 'fusion') {
+                // All attack types combined with 30% reduction (0.7 multiplier)
+                handleEnemyAttack({...e, type: 'rose', ...enemyTypes.rose, damageMultiplier: 0.7}, dt);
+                handleEnemyAttack({...e, type: 'sun', ...enemyTypes.sun, damageMultiplier: 0.7}, dt);
+                handleEnemyAttack({...e, type: 'kimdoyul', ...enemyTypes.kimdoyul, damageMultiplier: 0.7}, dt);
+            }
+        }
+        
+        function attackTower(e, dt) {
+            // Default tower attack when at end of path
+            towerHp -= 50 * dt;
+        }
+        
+        function updatePlayerUnits(dt) {
+            for (let i = playerUnits.length - 1; i >= 0; i--) {
+                const u = playerUnits[i];
+                const levelMult = u.level || 1;
+                
+                // Find nearest enemy
+                let nearestEnemy = null;
+                let nearestDist = Infinity;
+                for (const e of enemies) {
+                    const d = Math.hypot(e.x - u.x, e.y - u.y);
+                    if (d < nearestDist) {
+                        nearestDist = d;
+                        nearestEnemy = e;
+                    }
+                }
+                
+                if (u.role === 'tank' || u.type === 'jangseon') {
+                    // Tank attacks nearby enemies
+                    if (nearestEnemy && nearestDist < 80) {
+                        nearestEnemy.currentHp -= u.dps * levelMult * dt * (u.damageMultiplier || 1);
+                    }
+                }
+                
+                if (u.role === 'bomber' || u.type === 'foodduck') {
+                    // Drop bombs periodically
+                    u.lastAttack = (u.lastAttack || 0) + dt;
+                    if (u.lastAttack > 2) {
+                        u.lastAttack = 0;
+                        bombs.push({
+                            x: u.x + (Math.random() - 0.5) * 150,
+                            y: u.y + (Math.random() - 0.5) * 150,
+                            damage: (u.bombDmg || 30) * levelMult * (u.damageMultiplier || 1),
+                            timer: 0.5
+                        });
+                    }
+                }
+                
+                if (u.role === 'assassin' || u.type === 'disman') {
+                    u.assassinTimer = (u.assassinTimer || 0) + dt;
+                    
+                    if (u.assassinPhase === 'idle' && nearestEnemy) {
+                        u.assassinPhase = 'teleport';
+                        u.targetEnemy = nearestEnemy;
+                        u.assassinTimer = 0;
+                    }
+                    
+                    if (u.assassinPhase === 'teleport' && u.targetEnemy) {
+                        // Move behind enemy
+                        u.x = u.targetEnemy.x + 30;
+                        u.y = u.targetEnemy.y;
+                        u.assassinPhase = 'attack';
+                        u.assassinTimer = 0;
+                    }
+                    
+                    if (u.assassinPhase === 'attack') {
+                        // Attack for 5 seconds
+                        if (u.targetEnemy && u.targetEnemy.currentHp > 0) {
+                            u.targetEnemy.currentHp -= (u.dps || 50) * levelMult * dt * (u.damageMultiplier || 1);
+                            // Penetrating magic visual
+                            effects.push({
+                                type: 'magic',
+                                x: u.x,
+                                y: u.y,
+                                angle: Math.atan2(u.targetEnemy.y - u.y, u.targetEnemy.x - u.x),
+                                timer: 0.1
+                            });
+                        }
+                        if (u.assassinTimer > 5) {
+                            u.assassinPhase = 'return';
+                            u.assassinTimer = 0;
+                        }
+                    }
+                    
+                    if (u.assassinPhase === 'return') {
+                        const dx = u.originalPos.x - u.x;
+                        const dy = u.originalPos.y - u.y;
+                        const dist = Math.hypot(dx, dy);
+                        if (dist < 5) {
+                            u.assassinPhase = 'idle';
+                            u.targetEnemy = null;
+                        } else {
+                            u.x += (dx / dist) * 100 * dt;
+                            u.y += (dy / dist) * 100 * dt;
+                        }
+                    }
+                }
+                
+                if (u.role === 'fusion' || u.type === 'fusion') {
+                    // All abilities combined at 70%
+                    // Tank damage
+                    if (nearestEnemy && nearestDist < 80) {
+                        nearestEnemy.currentHp -= 2 * levelMult * 0.7 * dt;
+                    }
+                    // Bomber
+                    u.lastAttack = (u.lastAttack || 0) + dt;
+                    if (u.lastAttack > 2) {
+                        u.lastAttack = 0;
+                        bombs.push({
+                            x: u.x + (Math.random() - 0.5) * 150,
+                            y: u.y + (Math.random() - 0.5) * 150,
+                            damage: 30 * levelMult * 0.7,
+                            timer: 0.5
+                        });
+                    }
+                }
+                
+                // Check death
+                if (u.currentHp <= 0) {
+                    effects.push({
+                        type: 'death',
+                        x: u.x,
+                        y: u.y,
+                        color: u.color,
+                        timer: 0.5
+                    });
+                    // Remove associated turrets
+                    turrets = turrets.filter(t => t.owner !== u);
+                    playerUnits.splice(i, 1);
+                }
+            }
+        }
+        
+        function updateTurrets(dt) {
+            for (const t of turrets) {
+                let nearestEnemy = null;
+                let nearestDist = Infinity;
+                for (const e of enemies) {
+                    const d = Math.hypot(e.x - t.x, e.y - t.y);
+                    if (d < nearestDist && d < 200) {
+                        nearestDist = d;
+                        nearestEnemy = e;
+                    }
+                }
+                
+                if (nearestEnemy) {
+                    const levelMult = t.owner ? (t.owner.level || 1) : 1;
+                    nearestEnemy.currentHp -= t.dps * levelMult * dt;
+                    
+                    // Visual
+                    if (Math.random() < 0.3) {
+                        projectiles.push({
+                            x: t.x,
+                            y: t.y,
+                            targetX: nearestEnemy.x,
+                            targetY: nearestEnemy.y,
+                            color: '#e67e22',
+                            size: 4,
+                            speed: 300,
+                            damage: 0, // Already applied
+                            isEnemyProjectile: false
+                        });
+                    }
+                }
+            }
+        }
+        
+        function updateProjectiles(dt) {
+            for (let i = projectiles.length - 1; i >= 0; i--) {
+                const p = projectiles[i];
+                const dx = p.targetX - p.x;
+                const dy = p.targetY - p.y;
+                const dist = Math.hypot(dx, dy);
+                
+                if (dist < 10) {
+                    // Hit
+                    if (p.isEnemyProjectile) {
+                        if (p.targetUnit) {
+                            p.targetUnit.currentHp -= p.damage;
+                        } else {
+                            towerHp -= p.damage;
+                        }
+                    }
+                    projectiles.splice(i, 1);
+                } else {
+                    p.x += (dx / dist) * p.speed * dt;
+                    p.y += (dy / dist) * p.speed * dt;
+                }
+            }
+        }
+        
+        function updateBombs(dt) {
+            for (let i = bombs.length - 1; i >= 0; i--) {
+                const b = bombs[i];
+                b.timer -= dt;
+                
+                if (b.timer <= 0) {
+                    // Explode
+                    for (const e of enemies) {
+                        if (Math.hypot(e.x - b.x, e.y - b.y) < 50) {
+                            e.currentHp -= b.damage;
+                        }
+                    }
+                    effects.push({
+                        type: 'explosion',
+                        x: b.x,
+                        y: b.y,
+                        timer: 0.3
+                    });
+                    bombs.splice(i, 1);
+                }
+            }
+        }
+        
+        function updateEffects(dt) {
+            for (let i = effects.length - 1; i >= 0; i--) {
+                const e = effects[i];
+                e.timer -= dt;
+                
+                // Eyebrow zone damage
+                if (e.type === 'eyebrow' && e.timer > 0) {
+                    const towerPos = getTowerPos();
+                    if (Math.hypot(e.x - towerPos.x, e.y - towerPos.y) < 60) {
+                        towerHp -= e.dps * dt;
+                    }
+                    for (const u of playerUnits) {
+                        if (Math.hypot(e.x - u.x, e.y - u.y) < 60) {
+                            u.currentHp -= e.dps * dt;
+                        }
+                    }
+                }
+                
+                if (e.timer <= 0) {
+                    effects.splice(i, 1);
+                }
+            }
+        }
+        
+        // Wave management
+        let waveInProgress = false;
+        let spawnQueue = [];
+        let spawnTimer = 0;
+        
+        function startWave() {
+            waveInProgress = true;
+            spawnQueue = getWaveEnemies(wave);
+            spawnTimer = 0;
+            
+            const announce = document.getElementById('waveAnnounce');
+            announce.textContent = `웨이브 ${wave}`;
+            announce.style.opacity = '1';
+            setTimeout(() => announce.style.opacity = '0', 2000);
+        }
+        
+        function updateWave(dt) {
+            if (!waveInProgress) {
+                waveTimer -= dt;
+                document.getElementById('nextWave').textContent = Math.ceil(waveTimer);
+                
+                if (waveTimer <= 0) {
+                    startWave();
+                }
+            } else {
+                spawnTimer += dt;
+                if (spawnTimer > 1.5 && spawnQueue.length > 0) {
+                    spawnTimer = 0;
+                    spawnEnemy(spawnQueue.shift());
+                }
+                
+                if (spawnQueue.length === 0 && enemies.length === 0) {
+                    // Wave complete
+                    waveInProgress = false;
+                    wave++;
+                    waveTimer = 25;
+                    gold += 5 + wave * 2;
+                    updateUI();
+                }
+            }
+        }
+        
+        // Drawing functions
+        function draw3DTransform(x, y) {
+            // Simple 3D-like perspective
+            const cx = canvas.width / 2;
+            const cy = canvas.height / 2;
+            const rx = (x - cx) * Math.cos(cameraAngle) - (y - cy) * Math.sin(cameraAngle);
+            const ry = ((x - cx) * Math.sin(cameraAngle) + (y - cy) * Math.cos(cameraAngle)) * cameraTilt;
+            return {
+                x: cx + rx * cameraZoom,
+                y: cy + ry * cameraZoom + 50
+            };
+        }
+        
+        function drawPath() {
+            ctx.beginPath();
+            ctx.strokeStyle = '#334455';
+            ctx.lineWidth = 40;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            
+            for (let i = 0; i < pathPoints.length; i++) {
+                const p = draw3DTransform(pathPoints[i].x, pathPoints[i].y);
+                if (i === 0) ctx.moveTo(p.x, p.y);
+                else ctx.lineTo(p.x, p.y);
+            }
+            ctx.stroke();
+            
+            // Path edge
+            ctx.strokeStyle = '#445566';
+            ctx.lineWidth = 42;
+            ctx.stroke();
+        }
+        
+        function drawTower() {
+            const pos = draw3DTransform(canvas.width / 2, canvas.height / 2);
+            
+            // Tower base
+            ctx.fillStyle = '#2c3e50';
+            ctx.beginPath();
+            ctx.ellipse(pos.x, pos.y + 30, 50, 20, 0, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Tower body
+            const gradient = ctx.createLinearGradient(pos.x - 30, pos.y - 80, pos.x + 30, pos.y);
+            gradient.addColorStop(0, '#3498db');
+            gradient.addColorStop(1, '#2980b9');
+            ctx.fillStyle = gradient;
+            ctx.fillRect(pos.x - 30, pos.y - 80, 60, 100);
+            
+            // Tower top
+            ctx.fillStyle = '#e74c3c';
+            ctx.beginPath();
+            ctx.moveTo(pos.x - 40, pos.y - 80);
+            ctx.lineTo(pos.x, pos.y - 130);
+            ctx.lineTo(pos.x + 40, pos.y - 80);
+            ctx.fill();
+            
+            // HP bar
+            const hpPercent = towerHp / 500000;
+            ctx.fillStyle = '#333';
+            ctx.fillRect(pos.x - 40, pos.y - 145, 80, 10);
+            ctx.fillStyle = hpPercent > 0.5 ? '#2ecc71' : hpPercent > 0.25 ? '#f39c12' : '#e74c3c';
+            ctx.fillRect(pos.x - 40, pos.y - 145, 80 * hpPercent, 10);
+        }
+        
+        function drawEnemy(e) {
+            const pos = draw3DTransform(e.x, e.y);
+            
+            ctx.save();
+            ctx.translate(pos.x, pos.y);
+            
+            // Shadow
+            ctx.fillStyle = 'rgba(0,0,0,0.3)';
+            ctx.beginPath();
+            ctx.ellipse(0, e.size * 0.5, e.size * 0.7, e.size * 0.2, 0, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Body
+            if (e.type === 'rose') {
+                // Rose shape (flower)
+                ctx.fillStyle = '#ff6b6b';
+                for (let i = 0; i < 5; i++) {
+                    ctx.beginPath();
+                    ctx.ellipse(
+                        Math.cos(i * Math.PI * 2 / 5) * 10,
+                        Math.sin(i * Math.PI * 2 / 5) * 10 - 10,
+                        8, 12, i * Math.PI * 2 / 5, 0, Math.PI * 2
+                    );
+                    ctx.fill();
+                }
+                ctx.fillStyle = '#ffeb3b';
+                ctx.beginPath();
+                ctx.arc(0, -10, 6, 0, Math.PI * 2);
+                ctx.fill();
+            } else if (e.type === 'sun') {
+                // Sun shape
+                ctx.fillStyle = '#ffd93d';
+                ctx.beginPath();
+                ctx.arc(0, -15, 15, 0, Math.PI * 2);
+                ctx.fill();
+                // Rays
+                for (let i = 0; i < 8; i++) {
+                    ctx.beginPath();
+                    ctx.moveTo(0, -15);
+                    const angle = i * Math.PI / 4;
+                    ctx.lineTo(Math.cos(angle) * 25, -15 + Math.sin(angle) * 25);
+                    ctx.strokeStyle = '#ffd93d';
+                    ctx.lineWidth = 4;
+                    ctx.stroke();
+                }
+                // Smile
+                ctx.fillStyle = '#333';
+                ctx.beginPath();
+                ctx.arc(-5, -18, 3, 0, Math.PI * 2);
+                ctx.arc(5, -18, 3, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.beginPath();
+                ctx.arc(0, -12, 8, 0.1 * Math.PI, 0.9 * Math.PI);
+                ctx.strokeStyle = '#333';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+            } else if (e.type === 'horse') {
+                // Horse shape
+                ctx.fillStyle = '#8b4513';
+                // Body
+                ctx.fillRect(-15, -20, 30, 20);
+                // Head
+                ctx.beginPath();
+                ctx.ellipse(20, -25, 10, 15, 0.3, 0, Math.PI * 2);
+                ctx.fill();
+                // Legs
+                ctx.fillRect(-12, 0, 5, 15);
+                ctx.fillRect(8, 0, 5, 15);
+                // Mane
+                ctx.fillStyle = '#5d3a1a';
+                ctx.fillRect(-5, -30, 15, 8);
+            } else if (e.type === 'kimdoyul') {
+                // Kim Doyul - man with glasses and very long eyebrows
+                ctx.fillStyle = '#ffdbac';
+                ctx.beginPath();
+                ctx.arc(0, -20, 18, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Glasses
+                ctx.strokeStyle = '#333';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.rect(-15, -25, 12, 10);
+                ctx.rect(3, -25, 12, 10);
+                ctx.moveTo(-3, -20);
+                ctx.lineTo(3, -20);
+                ctx.stroke();
+                
+                // Very long eyebrows
+                ctx.strokeStyle = '#333';
+                ctx.lineWidth = 3;
+                ctx.beginPath();
+                ctx.moveTo(-20, -28);
+                ctx.quadraticCurveTo(-30, -35, -40, -25);
+                ctx.moveTo(20, -28);
+                ctx.quadraticCurveTo(30, -35, 40, -25);
+                ctx.stroke();
+                
+                // Body
+                ctx.fillStyle = '#9b59b6';
+                ctx.fillRect(-12, -2, 24, 25);
+            } else if (e.type === 'fusion') {
+                // Fusion boss - combined elements
+                ctx.fillStyle = '#e74c3c';
+                // Main body (glowing)
+                const glowGradient = ctx.createRadialGradient(0, -20, 0, 0, -20, 40);
+                glowGradient.addColorStop(0, '#ff6b6b');
+                glowGradient.addColorStop(0.5, '#e74c3c');
+                glowGradient.addColorStop(1, '#c0392b');
+                ctx.fillStyle = glowGradient;
+                ctx.beginPath();
+                ctx.arc(0, -20, 35, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Multiple faces
+                ctx.fillStyle = '#333';
+                for (let i = 0; i < 4; i++) {
+                    const angle = i * Math.PI / 2;
+                    const fx = Math.cos(angle) * 15;
+                    const fy = -20 + Math.sin(angle) * 15;
+                    ctx.beginPath();
+                    ctx.arc(fx - 3, fy - 2, 2, 0, Math.PI * 2);
+                    ctx.arc(fx + 3, fy - 2, 2, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+                
+                // Crown of eyebrows
+                ctx.strokeStyle = '#333';
+                ctx.lineWidth = 2;
+                for (let i = 0; i < 8; i++) {
+                    const angle = i * Math.PI / 4;
+                    ctx.beginPath();
+                    ctx.moveTo(Math.cos(angle) * 35, -20 + Math.sin(angle) * 35);
+                    ctx.lineTo(Math.cos(angle) * 50, -20 + Math.sin(angle) * 50);
+                    ctx.stroke();
+                }
+            }
+            
+            // HP bar
+            const hpPercent = e.currentHp / e.maxHp;
+            ctx.fillStyle = '#333';
+            ctx.fillRect(-20, -e.size - 15, 40, 5);
+            ctx.fillStyle = hpPercent > 0.5 ? '#2ecc71' : hpPercent > 0.25 ? '#f39c12' : '#e74c3c';
+            ctx.fillRect(-20, -e.size - 15, 40 * hpPercent, 5);
+            
+            ctx.restore();
+        }
+        
+        function drawPlayerUnit(u) {
+            const pos = draw3DTransform(u.x, u.y);
+            
+            ctx.save();
+            ctx.translate(pos.x, pos.y);
+            
+            // Shadow
+            ctx.fillStyle = 'rgba(0,0,0,0.3)';
+            ctx.beginPath();
+            ctx.ellipse(0, u.size * 0.3, u.size * 0.6, u.size * 0.15, 0, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Level indicator
+            if (u.level > 1) {
+                ctx.fillStyle = '#ffd700';
+                ctx.font = 'bold 12px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText(`Lv${u.level}`, 0, -u.size - 20);
+            }
+            
+            if (u.type === 'jangseon') {
+                // Wide eyebrows, no glasses
+                ctx.fillStyle = '#ffdbac';
+                ctx.beginPath();
+                ctx.arc(0, -15, 15, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Wide eyebrows
+                ctx.fillStyle = '#333';
+                ctx.fillRect(-12, -22, 10, 4);
+                ctx.fillRect(2, -22, 10, 4);
+                
+                // Eyes
+                ctx.beginPath();
+                ctx.arc(-5, -15, 3, 0, Math.PI * 2);
+                ctx.arc(5, -15, 3, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Body (tank)
+                ctx.fillStyle = '#3498db';
+                ctx.fillRect(-12, 0, 24, 20);
+                
+                // Shield
+                ctx.fillStyle = '#2980b9';
+                ctx.beginPath();
+                ctx.moveTo(-15, 5);
+                ctx.lineTo(-15, 15);
+                ctx.lineTo(-10, 20);
+                ctx.lineTo(-10, 5);
+                ctx.fill();
+            } else if (u.type === 'killjoy') {
+                // Long eyebrows, kills joyfully
+                ctx.fillStyle = '#ffdbac';
+                ctx.beginPath();
+                ctx.arc(0, -12, 12, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Long eyebrows
+                ctx.strokeStyle = '#333';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.moveTo(-8, -16);
+                ctx.quadraticCurveTo(-15, -20, -20, -14);
+                ctx.moveTo(8, -16);
+                ctx.quadraticCurveTo(15, -20, 20, -14);
+                ctx.stroke();
+                
+                // Evil smile
+                ctx.beginPath();
+                ctx.arc(0, -8, 5, 0, Math.PI);
+                ctx.stroke();
+                
+                // Body
+                ctx.fillStyle = '#e67e22';
+                ctx.fillRect(-10, 0, 20, 18);
+            } else if (u.type === 'foodduck') {
+                // Pigeon with long eyebrows
+                ctx.fillStyle = '#ecf0f1';
+                ctx.beginPath();
+                ctx.ellipse(0, -10, 12, 15, 0, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Wings
+                ctx.fillStyle = '#bdc3c7';
+                ctx.beginPath();
+                ctx.ellipse(-15, -5, 8, 12, -0.3, 0, Math.PI * 2);
+                ctx.ellipse(15, -5, 8, 12, 0.3, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Head
+                ctx.fillStyle = '#95a5a6';
+                ctx.beginPath();
+                ctx.arc(0, -25, 8, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Beak
+                ctx.fillStyle = '#f39c12';
+                ctx.beginPath();
+                ctx.moveTo(0, -25);
+                ctx.lineTo(5, -20);
+                ctx.lineTo(-5, -20);
+                ctx.fill();
+                
+                // Long eyebrows
+                ctx.strokeStyle = '#333';
+                ctx.lineWidth = 1;
+                ctx.beginPath();
+                ctx.moveTo(-5, -28);
+                ctx.lineTo(-15, -32);
+                ctx.moveTo(5, -28);
+                ctx.lineTo(15, -32);
+                ctx.stroke();
+                
+                // Floating indicator
+                if (u.flying) {
+                    ctx.strokeStyle = 'rgba(255,255,255,0.5)';
+                    ctx.setLineDash([3, 3]);
+                    ctx.beginPath();
+                    ctx.moveTo(0, 5);
+                    ctx.lineTo(0, 20);
+                    ctx.stroke();
+                    ctx.setLineDash([]);
+                }
+            } else if (u.type === 'disman') {
+                // Longest eyebrows in the game
+                ctx.fillStyle = '#ffdbac';
+                ctx.beginPath();
+                ctx.arc(0, -15, 14, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // THE LONGEST EYEBROWS
+                ctx.strokeStyle = '#333';
+                ctx.lineWidth = 3;
+                ctx.beginPath();
+                ctx.moveTo(-10, -20);
+                ctx.bezierCurveTo(-25, -30, -40, -25, -50, -15);
+                ctx.moveTo(10, -20);
+                ctx.bezierCurveTo(25, -30, 40, -25, 50, -15);
+                ctx.stroke();
+                
+                // Smirk
+                ctx.beginPath();
+                ctx.arc(3, -10, 6, 0.2 * Math.PI, 0.8 * Math.PI);
+                ctx.strokeStyle = '#333';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+                
+                // Body
+                ctx.fillStyle = '#1abc9c';
+                ctx.fillRect(-10, 0, 20, 20);
+            } else if (u.type === 'fusion') {
+                // Combined unit
+                const glowGradient = ctx.createRadialGradient(0, -15, 0, 0, -15, 30);
+                glowGradient.addColorStop(0, '#f1c40f');
+                glowGradient.addColorStop(0.5, '#f39c12');
+                glowGradient.addColorStop(1, '#e67e22');
+                ctx.fillStyle = glowGradient;
+                ctx.beginPath();
+                ctx.arc(0, -15, 25, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Multiple features
+                ctx.fillStyle = '#333';
+                ctx.beginPath();
+                ctx.arc(-8, -18, 3, 0, Math.PI * 2);
+                ctx.arc(8, -18, 3, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Multiple eyebrows
+                ctx.strokeStyle = '#333';
+                ctx.lineWidth = 2;
+                for (let i = 0; i < 4; i++) {
+                    const angle = (i - 1.5) * 0.3;
+                    ctx.beginPath();
+                    ctx.moveTo(-10, -22);
+                    ctx.lineTo(-10 + Math.cos(angle - Math.PI/2) * 20, -22 + Math.sin(angle - Math.PI/2) * 20);
+                    ctx.moveTo(10, -22);
+                    ctx.lineTo(10 + Math.cos(-angle - Math.PI/2) * 20, -22 + Math.sin(-angle - Math.PI/2) * 20);
+                    ctx.stroke();
+                }
+                
+                // Wings
+                ctx.fillStyle = 'rgba(255,255,255,0.5)';
+                ctx.beginPath();
+                ctx.ellipse(-25, -10, 10, 15, -0.3, 0, Math.PI * 2);
+                ctx.ellipse(25, -10, 10, 15, 0.3, 0, Math.PI * 2);
+                ctx.fill();
+            }
+            
+            // HP bar
+            const hpPercent = u.currentHp / u.maxHp;
+            ctx.fillStyle = '#333';
+            ctx.fillRect(-15, -u.size - 8, 30, 4);
+            ctx.fillStyle = '#2ecc71';
+            ctx.fillRect(-15, -u.size - 8, 30 * hpPercent, 4);
+            
+            ctx.restore();
+        }
+        
+        function drawTurret(t) {
+            const pos = draw3DTransform(t.x, t.y);
+            
+            ctx.save();
+            ctx.translate(pos.x, pos.y);
+            
+            // Base
+            ctx.fillStyle = '#7f8c8d';
+            ctx.beginPath();
+            ctx.ellipse(0, 5, 12, 5, 0, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Turret body
+            ctx.fillStyle = '#95a5a6';
+            ctx.fillRect(-8, -15, 16, 20);
+            
+            // Gun
+            ctx.fillStyle = '#333';
+            ctx.fillRect(-3, -25, 6, 12);
+            
+            ctx.restore();
+        }
+        
+        function drawProjectiles() {
+            for (const p of projectiles) {
+                const pos = draw3DTransform(p.x, p.y);
+                ctx.fillStyle = p.color;
+                ctx.beginPath();
+                ctx.arc(pos.x, pos.y, p.size, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Glow
+                ctx.shadowColor = p.color;
+                ctx.shadowBlur = 10;
+                ctx.fill();
+                ctx.shadowBlur = 0;
+            }
+        }
+        
+        function drawBombs() {
+            for (const b of bombs) {
+                const pos = draw3DTransform(b.x, b.y);
+                ctx.fillStyle = '#333';
+                ctx.beginPath();
+                ctx.arc(pos.x, pos.y, 8, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Fuse
+                ctx.strokeStyle = '#f39c12';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.moveTo(pos.x, pos.y - 8);
+                ctx.lineTo(pos.x + 5, pos.y - 15);
+                ctx.stroke();
+                
+                // Spark
+                ctx.fillStyle = '#ff6b6b';
+                ctx.beginPath();
+                ctx.arc(pos.x + 5, pos.y - 15, 3, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+        
+        function drawEffects() {
+            for (const e of effects) {
+                const pos = draw3DTransform(e.x, e.y);
+                
+                if (e.type === 'death') {
+                    ctx.fillStyle = e.color || '#ff0000';
+                    ctx.globalAlpha = e.timer * 2;
+                    for (let i = 0; i < 8; i++) {
+                        const angle = i * Math.PI / 4 + e.timer * 5;
+                        const dist = (0.5 - e.timer) * 50;
+                        ctx.beginPath();
+                        ctx.arc(pos.x + Math.cos(angle) * dist, pos.y + Math.sin(angle) * dist, 4, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+                    ctx.globalAlpha = 1;
+                } else if (e.type === 'explosion') {
+                    const radius = (0.3 - e.timer) * 150;
+                    ctx.strokeStyle = '#ff6b6b';
+                    ctx.lineWidth = 3;
+                    ctx.globalAlpha = e.timer * 3;
+                    ctx.beginPath();
+                    ctx.arc(pos.x, pos.y, radius, 0, Math.PI * 2);
+                    ctx.stroke();
+                    ctx.globalAlpha = 1;
+                } else if (e.type === 'levelup') {
+                    ctx.fillStyle = '#ffd700';
+                    ctx.font = 'bold 20px Arial';
+                    ctx.textAlign = 'center';
+                    ctx.globalAlpha = e.timer;
+                    ctx.fillText('LEVEL UP!', pos.x, pos.y - 40 - (1 - e.timer) * 30);
+                    ctx.globalAlpha = 1;
+                } else if (e.type === 'beam') {
+                    const pos2 = draw3DTransform(e.x2, e.y2);
+                    ctx.strokeStyle = e.color;
+                    ctx.lineWidth = 6;
+                    ctx.globalAlpha = 0.7;
+                    ctx.beginPath();
+                    ctx.moveTo(pos.x, pos.y);
+                    ctx.lineTo(pos2.x, pos2.y);
+                    ctx.stroke();
+                    ctx.globalAlpha = 1;
+                } else if (e.type === 'eyebrow') {
+                    // Eyebrow zone
+                    ctx.strokeStyle = '#9b59b6';
+                    ctx.lineWidth = 4;
+                    ctx.globalAlpha = 0.5 + Math.sin(Date.now() / 100) * 0.3;
+                    ctx.beginPath();
+                    ctx.moveTo(pos.x - 40, pos.y - 10);
+                    ctx.quadraticCurveTo(pos.x, pos.y - 30, pos.x + 40, pos.y - 10);
+                    ctx.stroke();
+                    
+                    ctx.fillStyle = 'rgba(155, 89, 182, 0.3)';
+                    ctx.beginPath();
+                    ctx.arc(pos.x, pos.y, 50, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.globalAlpha = 1;
+                } else if (e.type === 'magic') {
+                    ctx.strokeStyle = '#1abc9c';
+                    ctx.lineWidth = 3;
+                    ctx.globalAlpha = e.timer * 10;
+                    ctx.beginPath();
+                    ctx.moveTo(pos.x, pos.y);
+                    ctx.lineTo(pos.x + Math.cos(e.angle) * 100, pos.y + Math.sin(e.angle) * 100);
+                    ctx.stroke();
+                    ctx.globalAlpha = 1;
+                }
+            }
+        }
+        
+        function drawBackground() {
+            // Gradient background
+            const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+            gradient.addColorStop(0, '#1a1a2e');
+            gradient.addColorStop(1, '#16213e');
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Stars
+            ctx.fillStyle = 'rgba(255,255,255,0.5)';
+            for (let i = 0; i < 50; i++) {
+                const x = (i * 137 + Date.now() / 1000) % canvas.width;
+                const y = (i * 89) % (canvas.height / 2);
+                ctx.beginPath();
+                ctx.arc(x, y, 1, 0, Math.PI * 2);
+                ctx.fill();
+            }
+            
+            // Ground
+            ctx.fillStyle = '#0f3460';
+            ctx.beginPath();
+            ctx.ellipse(canvas.width / 2, canvas.height * 0.7, canvas.width * 0.6, canvas.height * 0.3, 0, 0, Math.PI * 2);
+            ctx.fill();
+        }
+        
+        // Main game loop
+        function gameLoop(timestamp) {
+            if (!gameStarted) {
+                requestAnimationFrame(gameLoop);
+                return;
+            }
+            
+            const dt = Math.min((timestamp - lastTime) / 1000, 0.1);
+            lastTime = timestamp;
+            
+            if (!gameOver) {
+                // Update
+                updateWave(dt);
+                updateEnemies(dt);
+                updatePlayerUnits(dt);
+                updateTurrets(dt);
+                updateProjectiles(dt);
+                updateBombs(dt);
+                updateEffects(dt);
+                
+                // Check game over
+                if (towerHp <= 0) {
+                    gameOver = true;
+                    document.getElementById('gameOver').style.display = 'block';
+                    document.getElementById('finalWave').textContent = wave;
+                }
+                
+                updateUI();
+            }
+            
+            // Draw
+            drawBackground();
+            drawPath();
+            drawTower();
+            
+            // Sort entities by Y for depth
+            const allEntities = [
+                ...enemies.map(e => ({type: 'enemy', data: e, y: e.y})),
+                ...playerUnits.map(u => ({type: 'unit', data: u, y: u.y})),
+                ...turrets.map(t => ({type: 'turret', data: t, y: t.y}))
+            ];
+            allEntities.sort((a, b) => a.y - b.y);
+            
+            for (const entity of allEntities) {
+                if (entity.type === 'enemy') drawEnemy(entity.data);
+                else if (entity.type === 'unit') drawPlayerUnit(entity.data);
+                else if (entity.type === 'turret') drawTurret(entity.data);
+            }
+            
+            drawProjectiles();
+            drawBombs();
+            drawEffects();
+            
+            requestAnimationFrame(gameLoop);
+        }
+        
+        function updateUI() {
+            document.getElementById('towerHp').textContent = Math.max(0, Math.floor(towerHp));
+            document.getElementById('gold').textContent = Math.floor(gold);
+            document.getElementById('wave').textContent = wave;
+        }
+        
+        // Input handling
+        let isDragging = false;
+        let lastMouseX = 0;
+        let lastMouseY = 0;
+        
+        canvas.addEventListener('mousedown', (e) => {
+            if (selectedUnit) {
+                // Place unit
+                const rect = canvas.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+                
+                // Convert screen to world (inverse of 3D transform)
+                const cx = canvas.width / 2;
+                const cy = canvas.height / 2;
+                const screenX = (x - cx) / cameraZoom;
+                const screenY = (y - cy - 50) / cameraZoom / cameraTilt;
+                
+                const worldX = cx + screenX * Math.cos(-cameraAngle) - screenY * Math.sin(-cameraAngle);
+                const worldY = cy + screenX * Math.sin(-cameraAngle) + screenY * Math.cos(-cameraAngle);
+                
+                if (spawnPlayerUnit(selectedUnit, worldX, worldY)) {
+                    // Keep selected for easier multiple placement
+                }
+            } else {
+                isDragging = true;
+                lastMouseX = e.clientX;
+                lastMouseY = e.clientY;
+            }
+        });
+        
+        canvas.addEventListener('mousemove', (e) => {
+            if (isDragging) {
+                const dx = e.clientX - lastMouseX;
+                cameraAngle += dx * 0.005;
+                lastMouseX = e.clientX;
+                lastMouseY = e.clientY;
+            }
+        });
+        
+        canvas.addEventListener('mouseup', () => {
+            isDragging = false;
+        });
+        
+        canvas.addEventListener('wheel', (e) => {
+            cameraZoom = Math.max(0.5, Math.min(2, cameraZoom - e.deltaY * 0.001));
+        });
+        
+        // Unit selection
+        document.querySelectorAll('.unitBtn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.unitBtn').forEach(b => b.classList.remove('selected'));
+                btn.classList.add('selected');
+                selectedUnit = btn.dataset.unit;
+            });
+        });
+        
+        // Right click to deselect
+        canvas.addEventListener('contextmenu', (e) => {
+            e.preventDefault();
+            selectedUnit = null;
+            document.querySelectorAll('.unitBtn').forEach(b => b.classList.remove('selected'));
+        });
+        
+        function startGame() {
+            document.getElementById('startScreen').style.display = 'none';
+            gameStarted = true;
+            lastTime = performance.now();
+        }
+        
+        // Start the loop
+        requestAnimationFrame(gameLoop);
+    </script>
+</body>
+</html>
